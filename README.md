@@ -25,11 +25,11 @@ food waste through a simple claim-and-pickup workflow.
 
 ## Database Design
 
-- `schema.sql` — full DDL: tables, constraints, indexes, view, trigger, stored
+- `schema.sql` - full DDL: tables, constraints, indexes, view, trigger, stored
   function, and a sample transaction demo
-- `NOSQL_DOCUMENTATION.md` — MongoDB collection structure and justification
-- `er-diagram.png` — Entity-Relationship diagram (Chen notation)
-- `relational-schema.png` — Relational schema diagram
+- `NOSQL_DOCUMENTATION.md` - MongoDB collection structure and justification
+- `er-diagram.png` - Entity-Relationship diagram (Chen notation)
+- `relational-schema.png` - Relational schema diagram
 
 ### SQL Tables
 
@@ -43,13 +43,13 @@ food waste through a simple claim-and-pickup workflow.
 
 ### Advanced Database Features
 
-1. **Trigger** — `trg_claim_updates_listing`: automatically marks a listing as
+1. **Trigger** - `trg_claim_updates_listing`: automatically marks a listing as
    `claimed` when a new claim is inserted.
-2. **Stored Function** — `get_available_listings_ranked()`: returns available
+2. **Stored Function** - `get_available_listings_ranked()`: returns available
    listings ordered by expiry.
-3. **View** — `available_listings_view`: joins listings, categories, and
+3. **View** - `available_listings_view`: joins listings, categories, and
    providers for currently available food.
-4. **Transaction** — atomic claim operation: locks the listing row, inserts the
+4. **Transaction** - atomic claim operation: locks the listing row, inserts the
    claim, and relies on a `UNIQUE` constraint + trigger to prevent race
    conditions when two recipients attempt to claim the same listing.
 
