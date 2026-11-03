@@ -18,6 +18,8 @@ const sampleListings: Record<string, FoodListing> = {
   "6": { id: 6, name: "Vegetable Sandwiches", category: "Bakery", quantity: "6 packs", location: "Jayanagar, Bengaluru", pickupTime: "Today, 4:00 PM", status: "Available", emoji: "🥪", description: "Freshly prepared vegetable sandwiches." },
 };
 
+export const dynamic = "force-dynamic";
+
 export default function ClaimFoodPage() {
   const params = useParams();
   const id = String(params.id);
