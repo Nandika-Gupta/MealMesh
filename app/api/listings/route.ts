@@ -11,7 +11,7 @@ export async function GET() {
   // attach MongoDB details (photos, packaging notes, allergen tags) to each listing
   const collection = await getListingDetailsCollection();
   const listingsWithDetails = await Promise.all(
-    listings.map(async (listing) => {
+    listings.map(async (listing: any) => {
       const details = await collection.findOne({ listing_id: listing.listing_id });
       return {
         ...listing,
