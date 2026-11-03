@@ -1,9 +1,7 @@
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { readProviderListings } from "@/lib/food-storage";
 
 type FoodItem = {
   id: string;
@@ -18,87 +16,18 @@ type FoodItem = {
   imageData?: string;
 };
 
-type StoredFoodItem = {
-  id: number;
-  name: string;
-  category: string;
+type ApiListing = {
+  listing_id: number;
+  category_name: string;
   quantity: string;
-  location: string;
-  pickupTime: string;
-  status: string;
-  emoji?: string;
-  description?: string;
-  imageData?: string;
+  unit: string;
+  usable_by: string;
+  provider_name: string;
+  provider_org: string | null;
+  photos?: string[];
+  packaging_notes?: string;
+  allergen_tags?: string[];
 };
-
-const foodItems: FoodItem[] = [
-  {
-    id: "sample-1",
-    name: "Fresh Vegetable Biryani",
-    category: "Meals",
-    quantity: "10 portions",
-    location: "Jayanagar, Bengaluru",
-    provider: "Community Kitchen",
-    expiry: "Today, 8:00 PM",
-    emoji: "🍛",
-    description: "Freshly prepared vegetable biryani, packed hygienically.",
-  },
-  {
-    id: "sample-2",
-    name: "Fresh Fruits Basket",
-    category: "Fruits",
-    quantity: "5 baskets",
-    location: "JP Nagar, Bengaluru",
-    provider: "Green Mart",
-    expiry: "Today, 6:00 PM",
-    emoji: "🍎",
-    description: "A selection of fresh seasonal fruits.",
-  },
-  {
-    id: "sample-3",
-    name: "Assorted Bread Pack",
-    category: "Bakery",
-    quantity: "15 packs",
-    location: "BTM Layout, Bengaluru",
-    provider: "Daily Bakers",
-    expiry: "Today, 7:00 PM",
-    emoji: "🍞",
-    description: "Fresh bread and bakery items available for collection.",
-  },
-  {
-    id: "sample-4",
-    name: "Homemade Dal and Rice",
-    category: "Meals",
-    quantity: "8 portions",
-    location: "Banashankari, Bengaluru",
-    provider: "Helping Hands",
-    expiry: "Today, 5:30 PM",
-    emoji: "🍲",
-    description: "Nutritious homemade dal and rice meals.",
-  },
-  {
-    id: "sample-5",
-    name: "Fresh Milk Packets",
-    category: "Dairy",
-    quantity: "12 packets",
-    location: "JP Nagar, Bengaluru",
-    provider: "Daily Needs Store",
-    expiry: "Tomorrow, 7:00 AM",
-    emoji: "🥛",
-    description: "Unopened milk packets stored under refrigeration.",
-  },
-  {
-    id: "sample-6",
-    name: "Vegetable Sandwiches",
-    category: "Bakery",
-    quantity: "6 packs",
-    location: "Jayanagar, Bengaluru",
-    provider: "Fresh Bites",
-    expiry: "Today, 4:00 PM",
-    emoji: "🥪",
-    description: "Freshly prepared vegetable sandwiches.",
-  },
-];
 
 const categories = [
   "All",
@@ -122,59 +51,43 @@ const categoryEmojis: Record<string, string> = {
 export default function ListingsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
-  const [providerItems, setProviderItems] = useState<FoodItem[]>([]);
+  const [items, setItems] = useState<FoodItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    function loadProviderListings() {
+    async function loadListings() {
       try {
-        const parsedListings = readProviderListings<StoredFoodItem>();
+        const res = await fetch("/api/listings");
+        const data: ApiListing[] = await res.json();
 
-        if (Array.isArray(parsedListings)) {
-          const convertedListings: FoodItem[] = parsedListings
-            .filter((item) => item.status === "Available")
-            .map((item) => ({
-              id: `provider-${item.id}`,
-              name: item.name,
-              category: item.category,
-              quantity: item.quantity,
-              location: item.location,
-              provider: "Community Provider",
-              expiry: item.pickupTime,
-              emoji:
-                item.emoji || categoryEmojis[item.category] || "🥗",
-              description:
-                item.description ||
-                "Food shared by a MealMesh community provider.",
-              imageData: item.imageData,
-            }));
+        const converted: FoodItem[] = data.map((listing) => ({
+          id: `db-${listing.listing_id}`,
+          name: listing.category_name,
+          category: listing.category_name,
+          quantity: `${listing.quantity} ${listing.unit}`,
+          location: listing.provider_org || listing.provider_name,
+          provider: listing.provider_name,
+          expiry: new Date(listing.usable_by).toLocaleString(),
+          emoji: categoryEmojis[listing.category_name] || "🥗",
+          description:
+            listing.packaging_notes ||
+            "Food shared through the MealMesh community.",
+          imageData: listing.photos && listing.photos[0],
+        }));
 
-          setProviderItems(convertedListings);
-        }
+        setItems(converted);
       } catch (error) {
-        console.error("Unable to load provider listings:", error);
+        console.error("Unable to load listings:", error);
+      } finally {
+        setLoading(false);
       }
     }
 
-    loadProviderListings();
-
-    window.addEventListener("storage", loadProviderListings);
-    window.addEventListener("focus", loadProviderListings);
-    window.addEventListener("pageshow", loadProviderListings);
-
-    return () => {
-      window.removeEventListener("storage", loadProviderListings);
-      window.removeEventListener("focus", loadProviderListings);
-      window.removeEventListener("pageshow", loadProviderListings);
-    };
+    loadListings();
   }, []);
 
-  const allItems = useMemo(
-    () => [...foodItems, ...providerItems],
-    [providerItems]
-  );
-
   const filteredItems = useMemo(() => {
-    return allItems.filter((item) => {
+    return items.filter((item) => {
       const matchesCategory =
         category === "All" || item.category === category;
 
@@ -188,7 +101,7 @@ export default function ListingsPage() {
 
       return matchesCategory && matchesSearch;
     });
-  }, [allItems, search, category]);
+  }, [items, search, category]);
 
   return (
     <main className="listings-page">
@@ -263,7 +176,11 @@ export default function ListingsPage() {
           Showing <strong>{filteredItems.length}</strong> food listings
         </div>
 
-        {filteredItems.length > 0 ? (
+        {loading ? (
+          <div className="no-listings">
+            <p>Loading listings...</p>
+          </div>
+        ) : filteredItems.length > 0 ? (
           <div className="food-grid">
             {filteredItems.map((item) => (
               <article className="food-card" key={item.id}>
