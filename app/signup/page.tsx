@@ -1,67 +1,84 @@
-
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-export default function SignupPage() {
-  const [role, setRole] = useState("recipient");
+export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(false);
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSignup = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    if (!email || !password) {
+      setMessage("Please enter your email and password.");
+      return;
+    }
+
+    setLoading(true);
     setMessage("");
 
-    const form = event.currentTarget;
-    const data = new FormData(form);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-    const password = data.get("password") as string;
-    const confirmPassword = data.get("confirmPassword") as string;
+      const result = await res.json();
 
-    if (password.length < 8) {
-      setMessage("Password must contain at least 8 characters.");
-      return;
+      if (!res.ok) {
+        setMessage(result.error || "Invalid email or password.");
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem(
+        "mealmesh-user",
+        JSON.stringify({ user_id: result.user_id, name: result.name, role: result.role })
+      );
+
+      setMessage("Login successful! Redirecting...");
+      router.push("/dashboard");
+    } catch (error) {
+      setMessage("Something went wrong. Please try again.");
+      setLoading(false);
     }
-
-    if (password !== confirmPassword) {
-      setMessage("Passwords do not match.");
-      return;
-    }
-
-    setMessage(
-      "Your form is valid! Account creation will be enabled after backend integration."
-    );
-  };
+  }
 
   return (
     <main className="auth-page">
       <div className="auth-left">
         <Link href="/" className="brand auth-brand">
           <span className="brand-icon">🥬</span>
-          <span>
-            Meal<span className="brand-highlight">Mesh</span>
-          </span>
+          <span>Meal<span className="brand-highlight">Mesh</span></span>
         </Link>
 
         <div className="auth-left-content">
-          <span className="section-tag">A COMMUNITY THAT CARES</span>
+          <div className="eyebrow">A COMMUNITY THAT CARES</div>
+
           <h1>
-            Share more.
+            Welcome
             <br />
-            Waste less.
-            <br />
-            <span>Live better.</span>
+            <span>back.</span>
           </h1>
+
           <p>
-            Join a growing community connecting surplus food
-            with people who need it. Every small contribution
-            makes a difference.
+            Good to see you again! Continue being part of a community
+            that believes in sharing more, wasting less and making
+            every meal count.
           </p>
 
           <div className="auth-benefits">
-            <div><span>✓</span> Give surplus food a purpose</div>
-            <div><span>✓</span> Discover food in your community</div>
-            <div><span>✓</span> Be part of a sustainable future</div>
+            <div><span>✓</span> Discover surplus food nearby</div>
+            <div><span>✓</span> Share food with your community</div>
+            <div><span>✓</span> Make a meaningful difference</div>
           </div>
         </div>
 
@@ -73,101 +90,86 @@ export default function SignupPage() {
       <div className="auth-right">
         <div className="auth-form-container">
           <div className="auth-heading">
-            <span className="section-tag">GET STARTED</span>
-            <h2>Create your account</h2>
-            <p>Join MealMesh and become part of the change.</p>
+            <div className="section-tag">WELCOME BACK</div>
+            <h2>Log in to MealMesh</h2>
+            <p>Enter your details to access your account.</p>
           </div>
 
-          <form onSubmit={handleSignup} className="auth-form">
-            <label htmlFor="name">Full name</label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              placeholder="Enter your full name"
-              required
-              autoComplete="name"
-            />
-
+          <form className="auth-form" onSubmit={handleLogin}>
             <label htmlFor="email">Email address</label>
             <input
               id="email"
-              name="email"
               type="email"
               placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
-              autoComplete="email"
             />
 
-            <label>I want to join as a</label>
-            <div className="role-options">
+            <label htmlFor="password">Password</label>
+            <div style={{ position: "relative" }}>
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                style={{ paddingRight: "65px" }}
+              />
               <button
                 type="button"
-                className={`role-option ${role === "recipient" ? "selected" : ""}`}
-                onClick={() => setRole("recipient")}
-                aria-pressed={role === "recipient"}
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  border: "none",
+                  background: "transparent",
+                  color: "#39734b",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                }}
               >
-                <span className="role-icon">🧑‍🤝‍🧑</span>
-                <strong>Recipient</strong>
-                <small>Find and claim food</small>
-              </button>
-
-              <button
-                type="button"
-                className={`role-option ${role === "provider" ? "selected" : ""}`}
-                onClick={() => setRole("provider")}
-                aria-pressed={role === "provider"}
-              >
-                <span className="role-icon">🍱</span>
-                <strong>Provider</strong>
-                <small>Share surplus food</small>
+                {showPassword ? "Hide" : "Show"}
               </button>
             </div>
 
-            <input type="hidden" name="role" value={role} />
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: "10px",
+              fontSize: "12px",
+            }}>
+              <label className="terms-label" style={{ margin: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                />
+                Remember me
+              </label>
 
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="At least 8 characters"
-              minLength={8}
-              required
-              autoComplete="new-password"
-            />
-
-            <label htmlFor="confirmPassword">Confirm password</label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              placeholder="Re-enter your password"
-              required
-              autoComplete="new-password"
-            />
-
-            <label className="terms-label">
-              <input type="checkbox" required />
-              <span>
-                I agree to the terms of service and privacy policy.
-              </span>
-            </label>
+              <Link href="/forgot-password" style={{ color: "#39734b" }}>
+                Forgot password?
+              </Link>
+            </div>
 
             {message && (
-              <p className="auth-message" role="status">
-                {message}
-              </p>
+              <div className="auth-message">{message}</div>
             )}
 
-            <button type="submit" className="auth-submit">
-              Create account <span>→</span>
+            <button type="submit" className="auth-submit" disabled={loading}>
+              {loading ? "Logging in..." : "Log in"} <span>→</span>
             </button>
           </form>
 
           <p className="auth-switch">
-            Already have an account?{" "}
-            <Link href="/login">Log in</Link>
+            Don't have an account?{" "}
+            <Link href="/signup">Create account</Link>
           </p>
 
           <Link href="/" className="back-home">
