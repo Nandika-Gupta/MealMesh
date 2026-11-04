@@ -1276,6 +1276,11 @@ a {
   font-size: 125px;
 }
 
+/* anchor the absolutely positioned category badge to the details panel */
+.claim-details {
+  position: relative;
+}
+
 .claim-category {
   position: absolute;
   top: 20px;
@@ -1799,6 +1804,17 @@ a {
   background: #194b35 !important;
   color: white !important;
   padding: 30px !important;
+}
+
+/* light text on the dark green dashboard bar (logo and active link were #194b35) */
+.dashboard-navbar .dashboard-logo,
+.dashboard-nav-links a:hover,
+.dashboard-nav-links .active {
+  color: #ffffff;
+}
+
+.dashboard-nav-links a {
+  color: #cfe0c8;
 }
 
 .dashboard-welcome {
