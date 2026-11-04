@@ -10,6 +10,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "All fields are required." }, { status: 400 });
   }
 
+  // admin accounts are created directly in the database, never through public signup
+  if (role !== "provider" && role !== "recipient") {
+    return NextResponse.json({ error: "Role must be either provider or recipient." }, { status: 400 });
+  }
+
   if (password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
   }
