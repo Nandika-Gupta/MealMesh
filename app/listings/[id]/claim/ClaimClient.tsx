@@ -2,13 +2,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { readProviderListings, saveProviderListings } from "@/lib/food-storage";
+import { getSession } from "@/lib/session";
 
 type FoodListing = { id: number; name: string; category: string; quantity: string; location: string; pickupTime: string; status: string; emoji?: string; description?: string; imageData?: string };
 type Claim = { id: string; listingId: string; name: string; category: string; quantity: string; provider: string; location: string; pickupTime: string; status: "Confirmed" | "Collected"; emoji: string; imageData?: string; claimedAt: number };
+type ApiListing = { listing_id: number; category_name: string; quantity: string; unit: string; usable_by: string; status: string; provider_name: string; provider_org: string | null; photos?: string[]; packaging_notes?: string };
 const CLAIMS_KEY = "mealmesh-recipient-claims";
+const dbStatusLabels: Record<string, string> = { available: "Available", claimed: "Claimed", delivered: "Collected", expired: "Expired" };
+const categoryEmojis: Record<string, string> = { "Cooked Meals": "🍛", Produce: "🥦", Bakery: "🍞", Dairy: "🥛", "Packaged Goods": "📦", Other: "🥗" };
+
+function fromApiListing(row: ApiListing): FoodListing {
+  return { id: row.listing_id, name: row.category_name, category: row.category_name, quantity: `${Number(row.quantity)} ${row.unit}`, location: row.provider_org || row.provider_name, pickupTime: `Collect by ${new Date(row.usable_by).toLocaleString()}`, status: dbStatusLabels[row.status] || row.status, emoji: categoryEmojis[row.category_name] || "🥗", description: row.packaging_notes, imageData: row.photos?.[0] };
+}
 const sampleListings: Record<string, FoodListing> = {
   "1": { id: 1, name: "Fresh Vegetable Biryani", category: "Meals", quantity: "10 portions", location: "Jayanagar, Bengaluru", pickupTime: "Today, 8:00 PM", status: "Available", emoji: "🍛", description: "Freshly prepared vegetable biryani, packed hygienically." },
   "2": { id: 2, name: "Fresh Fruits Basket", category: "Fruits", quantity: "5 baskets", location: "JP Nagar, Bengaluru", pickupTime: "Today, 6:00 PM", status: "Available", emoji: "🍎", description: "A selection of fresh seasonal fruits." },
@@ -20,14 +28,28 @@ const sampleListings: Record<string, FoodListing> = {
 
 export default function ClaimFoodPage() {
   const params = useParams();
+  const router = useRouter();
   const id = String(params.id);
   const providerId = id.startsWith("provider-") ? id.slice("provider-".length) : "";
+  const dbListingId = id.startsWith("db-") ? id.slice("db-".length) : "";
   const [listing, setListing] = useState<FoodListing | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [claiming, setClaiming] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (dbListingId) {
+      fetch(`/api/listings/${encodeURIComponent(dbListingId)}`)
+        .then(async (res) => {
+          if (res.status === 404) { setListing(null); return; }
+          if (!res.ok) throw new Error("Request failed");
+          setListing(fromApiListing(await res.json()));
+        })
+        .catch(() => setError("Unable to load this listing."))
+        .finally(() => setLoading(false));
+      return;
+    }
     try {
       if (providerId) {
         const items = readProviderListings<FoodListing>();
@@ -37,10 +59,40 @@ export default function ClaimFoodPage() {
       } else setListing(null);
     } catch { setError("Unable to load this listing."); }
     finally { setLoading(false); }
-  }, [id, providerId]);
+  }, [id, providerId, dbListingId]);
+
+  async function handleDbClaim() {
+    if (!listing) return;
+    const session = getSession();
+    if (!session) { router.push("/login"); return; }
+    if (session.role !== "recipient") { setError("Only recipient accounts can claim food."); return; }
+
+    setClaiming(true);
+    setError("");
+    try {
+      const res = await fetch("/api/claims", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listing_id: listing.id, recipient_id: session.user_id }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setError(result.error || "Unable to complete your claim. Please try again.");
+        if (res.status === 409) setListing({ ...listing, status: "Claimed" });
+        return;
+      }
+      setListing({ ...listing, status: "Claimed" });
+      setConfirmed(true);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setClaiming(false);
+    }
+  }
 
   function handleClaim() {
     if (!listing || listing.status !== "Available") return;
+    if (dbListingId) { handleDbClaim(); return; }
     try {
       if (providerId) {
         const items = readProviderListings<FoodListing>();
@@ -63,6 +115,6 @@ export default function ClaimFoodPage() {
 
   return <main className="claim-page"><nav className="claim-navbar"><Link href="/" className="claim-logo">MealMesh</Link><Link href="/listings">Back to listings</Link></nav>
     <section className="claim-container"><div className="claim-image">{listing.imageData ? <img src={listing.imageData} alt={listing.name} /> : <span>{listing.emoji || "🍽️"}</span>}</div><div className="claim-details"><p className="claim-eyebrow">FOOD DETAILS</p><span className="claim-category">{listing.category}</span><h1>{listing.name}</h1><p className="claim-description">{listing.description || "Food shared through the MealMesh community."}</p><div className="claim-info"><p><strong>Quantity:</strong> {listing.quantity}</p><p><strong>Pickup location:</strong> {listing.location}</p><p><strong>Pickup time:</strong> {listing.pickupTime}</p><p><strong>Status:</strong> {confirmed ? "Claimed by you" : listing.status}</p></div>{error && <p className="claim-error">{error}</p>}
-      {confirmed ? <div className="claim-success"><h2>Claim confirmed!</h2><p>Your claim is now saved in your recipient dashboard. Please collect it during the pickup window.</p><Link href="/dashboard">View my dashboard</Link></div> : listing.status === "Claimed" ? <div className="claim-success"><h2>Already claimed</h2><p>This food listing is no longer available.</p><Link href="/listings">Browse other listings</Link></div> : <button className="claim-action" onClick={handleClaim}>Confirm Food Claim</button>}
+      {confirmed ? <div className="claim-success"><h2>Claim confirmed!</h2><p>Your claim is now saved in your recipient dashboard. Please collect it during the pickup window.</p><Link href="/dashboard">View my dashboard</Link></div> : listing.status !== "Available" ? <div className="claim-success"><h2>{listing.status === "Expired" ? "Listing expired" : "Already claimed"}</h2><p>This food listing is no longer available.</p><Link href="/listings">Browse other listings</Link></div> : <button className="claim-action" onClick={handleClaim} disabled={claiming}>{claiming ? "Claiming..." : "Confirm Food Claim"}</button>}
     </div></section><footer className="claim-footer"><p>© {new Date().getFullYear()} MealMesh. Sharing food, reducing waste.</p></footer></main>;
 }
