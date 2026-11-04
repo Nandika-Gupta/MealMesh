@@ -43,5 +43,8 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/listings/[i
     photos: details?.photos || [],
     packaging_notes: details?.packaging_notes || "",
     allergen_tags: details?.allergen_tags || [],
+    food_name: details?.food_name || "",
+    pickup_location: details?.pickup_location || "",
+    pickup_from: details?.pickup_from || null,
   });
 }

@@ -27,24 +27,27 @@ type ApiListing = {
   photos?: string[];
   packaging_notes?: string;
   allergen_tags?: string[];
+  food_name?: string;
+  pickup_location?: string;
 };
 
+// matches the rows seeded into FoodCategories in schema.sql
 const categories = [
   "All",
-  "Meals",
-  "Fruits",
-  "Vegetables",
+  "Cooked Meals",
+  "Produce",
   "Bakery",
   "Dairy",
+  "Packaged Goods",
   "Other",
 ];
 
 const categoryEmojis: Record<string, string> = {
-  Meals: "🍛",
-  Fruits: "🍎",
-  Vegetables: "🥦",
+  "Cooked Meals": "🍛",
+  Produce: "🥦",
   Bakery: "🍞",
   Dairy: "🥛",
+  "Packaged Goods": "📦",
   Other: "🥗",
 };
 
@@ -62,10 +65,10 @@ export default function ListingsPage() {
 
         const converted: FoodItem[] = data.map((listing) => ({
           id: `db-${listing.listing_id}`,
-          name: listing.category_name,
+          name: listing.food_name || listing.category_name,
           category: listing.category_name,
-          quantity: `${listing.quantity} ${listing.unit}`,
-          location: listing.provider_org || listing.provider_name,
+          quantity: `${Number(listing.quantity)} ${listing.unit}`,
+          location: listing.pickup_location || listing.provider_org || listing.provider_name,
           provider: listing.provider_name,
           expiry: new Date(listing.usable_by).toLocaleString(),
           emoji: categoryEmojis[listing.category_name] || "🥗",

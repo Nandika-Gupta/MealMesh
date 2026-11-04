@@ -9,13 +9,15 @@ import { getSession } from "@/lib/session";
 
 type FoodListing = { id: number; name: string; category: string; quantity: string; location: string; pickupTime: string; status: string; emoji?: string; description?: string; imageData?: string };
 type Claim = { id: string; listingId: string; name: string; category: string; quantity: string; provider: string; location: string; pickupTime: string; status: "Confirmed" | "Collected"; emoji: string; imageData?: string; claimedAt: number };
-type ApiListing = { listing_id: number; category_name: string; quantity: string; unit: string; usable_by: string; status: string; provider_name: string; provider_org: string | null; photos?: string[]; packaging_notes?: string };
+type ApiListing = { listing_id: number; category_name: string; quantity: string; unit: string; usable_by: string; status: string; provider_name: string; provider_org: string | null; photos?: string[]; packaging_notes?: string; food_name?: string; pickup_location?: string; pickup_from?: string | null };
 const CLAIMS_KEY = "mealmesh-recipient-claims";
 const dbStatusLabels: Record<string, string> = { available: "Available", claimed: "Claimed", delivered: "Collected", expired: "Expired" };
 const categoryEmojis: Record<string, string> = { "Cooked Meals": "🍛", Produce: "🥦", Bakery: "🍞", Dairy: "🥛", "Packaged Goods": "📦", Other: "🥗" };
 
 function fromApiListing(row: ApiListing): FoodListing {
-  return { id: row.listing_id, name: row.category_name, category: row.category_name, quantity: `${Number(row.quantity)} ${row.unit}`, location: row.provider_org || row.provider_name, pickupTime: `Collect by ${new Date(row.usable_by).toLocaleString()}`, status: dbStatusLabels[row.status] || row.status, emoji: categoryEmojis[row.category_name] || "🥗", description: row.packaging_notes, imageData: row.photos?.[0] };
+  const deadline = new Date(row.usable_by).toLocaleString();
+  const pickupTime = row.pickup_from ? `${new Date(row.pickup_from).toLocaleString()} – ${deadline}` : `Collect by ${deadline}`;
+  return { id: row.listing_id, name: row.food_name || row.category_name, category: row.category_name, quantity: `${Number(row.quantity)} ${row.unit}`, location: row.pickup_location || row.provider_org || row.provider_name, pickupTime, status: dbStatusLabels[row.status] || row.status, emoji: categoryEmojis[row.category_name] || "🥗", description: row.packaging_notes, imageData: row.photos?.[0] };
 }
 const sampleListings: Record<string, FoodListing> = {
   "1": { id: 1, name: "Fresh Vegetable Biryani", category: "Meals", quantity: "10 portions", location: "Jayanagar, Bengaluru", pickupTime: "Today, 8:00 PM", status: "Available", emoji: "🍛", description: "Freshly prepared vegetable biryani, packed hygienically." },

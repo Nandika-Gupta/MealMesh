@@ -5,38 +5,52 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { readProviderListings, saveProviderListings } from "@/lib/food-storage";
+import { getSession, type SessionUser } from "@/lib/session";
 
-type FoodListing = {
-  id: number;
-  name: string;
-  category: string;
-  quantity: string;
-  pickupTime: string;
-  location: string;
-  status: "Available" | "Claimed";
-  emoji: string;
-  description: string;
-  imageData?: string;
+type Category = { category_id: number; name: string };
+
+const emptyForm = {
+  name: "",
+  categoryId: "",
+  quantity: "",
+  unit: "portions",
+  location: "",
+  pickupDate: "",
+  pickupStart: "",
+  pickupEnd: "",
+  description: "",
+  imageData: "",
 };
 
 export default function NewFoodListing() {
   const router = useRouter();
 
-  const [form, setForm] = useState({
-    name: "",
-    category: "Meals",
-    quantity: "",
-    location: "",
-    pickupDate: "",
-    pickupStart: "",
-    pickupEnd: "",
-    description: "",
-    imageData: "",
-  });
+  const [form, setForm] = useState(emptyForm);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [session, setSession] = useState<SessionUser | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const [message, setMessage] = useState("");
   const [minimumDate, setMinimumDate] = useState("");
+
+  useEffect(() => {
+    const user = getSession();
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    setSession(user);
+
+    fetch("/api/categories")
+      .then((res) => res.json())
+      .then((data: Category[]) => {
+        setCategories(data);
+        if (data.length > 0) {
+          setForm((current) => current.categoryId ? current : { ...current, categoryId: String(data[0].category_id) });
+        }
+      })
+      .catch(() => setMessage("Unable to load food categories."));
+  }, [router]);
 
   useEffect(() => {
     const today = new Date();
@@ -74,54 +88,64 @@ export default function NewFoodListing() {
     reader.readAsDataURL(file);
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    if (!session) {
+      router.replace("/login");
+      return;
+    }
+
+    if (session.role !== "provider") {
+      setMessage("Only provider accounts can post food listings.");
+      return;
+    }
 
     if (form.pickupEnd <= form.pickupStart) {
       setMessage("Pickup end time must be later than the start time.");
       return;
     }
 
-    const emojiMap: Record<string, string> = {
-      Meals: "🍛",
-      Fruits: "🍎",
-      Vegetables: "🥦",
-      Bakery: "🍞",
-      Dairy: "🥛",
-      Other: "🥗",
-    };
+    // the end of the pickup window becomes usable_by in SurplusListings
+    const usableBy = new Date(`${form.pickupDate}T${form.pickupEnd}`);
+    const pickupFrom = new Date(`${form.pickupDate}T${form.pickupStart}`);
 
-    const newListing: FoodListing = {
-      id: Date.now(),
-      name: form.name.trim(),
-      category: form.category,
-      quantity: form.quantity.trim(),
-      pickupTime: `${form.pickupDate}, ${form.pickupStart} – ${form.pickupEnd}`,
-      location: form.location.trim(),
-      status: "Available",
-      emoji: emojiMap[form.category] || "🥗",
-      description: form.description.trim(),
-      imageData: form.imageData || undefined,
-    };
+    if (usableBy.getTime() <= Date.now()) {
+      setMessage("Pickup end time must be in the future.");
+      return;
+    }
+
+    setSubmitting(true);
+    setMessage("");
 
     try {
-      const listings = readProviderListings<FoodListing>();
-      listings.push(newListing);
-      saveProviderListings(listings);
-
-      setMessage("Your food listing has been saved successfully!");
-
-      setForm({
-        name: "",
-        category: "Meals",
-        quantity: "",
-        location: "",
-        pickupDate: "",
-        pickupStart: "",
-        pickupEnd: "",
-        description: "",
-        imageData: "",
+      const res = await fetch("/api/listings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category_id: Number(form.categoryId),
+          provider_id: session.user_id,
+          quantity: Number(form.quantity),
+          unit: form.unit.trim(),
+          usable_by: usableBy.toISOString(),
+          food_name: form.name.trim(),
+          pickup_location: form.location.trim(),
+          pickup_from: pickupFrom.toISOString(),
+          packaging_notes: form.description.trim(),
+          photos: form.imageData ? [form.imageData] : [],
+        }),
       });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setMessage(result.error || "Unable to save your listing. Please try again.");
+        setSubmitting(false);
+        return;
+      }
+
+      setMessage("Your food listing has been published successfully!");
+      setForm({ ...emptyForm, categoryId: form.categoryId });
 
       setTimeout(() => {
         router.push("/provider/dashboard");
@@ -129,6 +153,7 @@ export default function NewFoodListing() {
     } catch (error) {
       console.error("Unable to save listing:", error);
       setMessage("Unable to save your listing. Please try again.");
+      setSubmitting(false);
     }
   }
 
@@ -175,28 +200,49 @@ export default function NewFoodListing() {
 
           <label htmlFor="category">Food Category</label>
           <select
-            id="category"
-            name="category"
-            value={form.category}
+            id="categoryId"
+            name="categoryId"
+            value={form.categoryId}
             onChange={handleChange}
+            required
           >
-            <option>Meals</option>
-            <option>Fruits</option>
-            <option>Vegetables</option>
-            <option>Bakery</option>
-            <option>Dairy</option>
-            <option>Other</option>
+            {categories.length === 0 && <option value="">Loading categories...</option>}
+            {categories.map((item) => (
+              <option key={item.category_id} value={item.category_id}>
+                {item.name}
+              </option>
+            ))}
           </select>
 
-          <label htmlFor="quantity">Available Quantity</label>
-          <input
-            id="quantity"
-            name="quantity"
-            value={form.quantity}
-            onChange={handleChange}
-            placeholder="e.g. 5 portions or 3 kg"
-            required
-          />
+          <div className="pickup-time-grid">
+            <div>
+              <label htmlFor="quantity">Available Quantity</label>
+              <input
+                id="quantity"
+                name="quantity"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={form.quantity}
+                onChange={handleChange}
+                placeholder="e.g. 5"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="unit">Unit</label>
+              <input
+                id="unit"
+                name="unit"
+                value={form.unit}
+                onChange={handleChange}
+                placeholder="e.g. portions, kg, packs"
+                maxLength={20}
+                required
+              />
+            </div>
+          </div>
 
           <label htmlFor="foodImage">Food Photo (optional, max 1.5 MB)</label>
           <input id="foodImage" type="file" accept="image/*" onChange={handleImageChange} />
@@ -264,8 +310,8 @@ export default function NewFoodListing() {
             </div>
           </div>
 
-          <button type="submit" className="publish-listing-button">
-            Publish Food Listing →
+          <button type="submit" className="publish-listing-button" disabled={submitting}>
+            {submitting ? "Publishing..." : "Publish Food Listing →"}
           </button>
 
           {message && (
