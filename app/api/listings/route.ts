@@ -1,31 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { getListingDetailsCollection } from "@/lib/mongodb";
+import { attachListingDetails, getListingDetailsCollection } from "@/lib/mongodb";
 
 // GET /api/listings - fetch all currently available listings
-export async function GET() {
+// GET /api/listings?provider_id=X - fetch every listing (any status) posted by one provider
+export async function GET(req: NextRequest) {
+  const providerParam = req.nextUrl.searchParams.get("provider_id");
   const db = getDb();
-  const result = await db.query("SELECT * FROM available_listings_view");
-  const listings = result.rows;
 
-  // attach MongoDB details (photos, packaging notes, allergen tags) to each listing
-  const collection = await getListingDetailsCollection();
-  const listingsWithDetails = await Promise.all(
-    listings.map(async (listing: any) => {
-      const details = await collection.findOne({ listing_id: listing.listing_id });
-      return {
-        ...listing,
-        photos: details?.photos || [],
-        packaging_notes: details?.packaging_notes || "",
-        allergen_tags: details?.allergen_tags || [],
-        food_name: details?.food_name || "",
-        pickup_location: details?.pickup_location || "",
-        pickup_from: details?.pickup_from || null,
-      };
-    })
+  if (providerParam === null) {
+    const result = await db.query("SELECT * FROM available_listings_view");
+    return NextResponse.json(await attachListingDetails(result.rows));
+  }
+
+  const providerId = Number(providerParam);
+  if (!Number.isInteger(providerId) || providerId <= 0) {
+    return NextResponse.json({ error: "Invalid provider id." }, { status: 400 });
+  }
+
+  const result = await db.query(
+    `SELECT sl.listing_id,
+            fc.name      AS category_name,
+            sl.quantity,
+            sl.unit,
+            sl.usable_by,
+            CASE WHEN sl.status = 'available' AND sl.usable_by <= NOW()
+                 THEN 'expired' ELSE sl.status END AS status,
+            sl.created_at,
+            c.claim_id,
+            c.status     AS claim_status,
+            r.name       AS recipient_name
+     FROM SurplusListings sl
+     JOIN FoodCategories fc ON fc.category_id = sl.category_id
+     LEFT JOIN Claims c     ON c.listing_id = sl.listing_id
+     LEFT JOIN Users r      ON r.user_id = c.recipient_id
+     WHERE sl.provider_id = $1
+     ORDER BY sl.created_at DESC`,
+    [providerId]
   );
 
-  return NextResponse.json(listingsWithDetails);
+  return NextResponse.json(await attachListingDetails(result.rows));
 }
 
 // POST /api/listings - create a new listing (provider posts surplus food)

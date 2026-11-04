@@ -2,36 +2,39 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { readProviderListings, saveProviderListings } from "@/lib/food-storage";
-
-type FoodListing = {
-  id: number;
-  name: string;
-  category: string;
-  quantity: string;
-  pickupTime: string;
-  location: string;
-  status: "Available" | "Claimed" | "Collected";
-  emoji: string;
-  description?: string;
-  imageData?: string;
-};
+import { getSession, type SessionUser } from "@/lib/session";
+import { toDisplayListing, type ApiListing, type DisplayListing } from "@/lib/listings";
 
 export default function ProviderDashboard() {
-  const [listings, setListings] = useState<FoodListing[]>([]);
+  const router = useRouter();
+  const [session, setSession] = useState<SessionUser | null>(null);
+  const [listings, setListings] = useState<DisplayListing[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
 
-  const loadListings = useCallback(() => {
+  const loadListings = useCallback(async () => {
+    const user = getSession();
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    setSession(user);
+
     try {
-      setListings(readProviderListings<FoodListing>());
+      const res = await fetch(`/api/listings?provider_id=${user.user_id}`);
+      if (!res.ok) throw new Error("Request failed");
+      const data: ApiListing[] = await res.json();
+      setListings(data.map(toDisplayListing));
+      setError("");
     } catch (error) {
       console.error("Unable to load provider listings:", error);
-      setListings([]);
+      setError("Unable to load your listings.");
     } finally {
       setLoaded(true);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     loadListings();
@@ -43,10 +46,19 @@ export default function ProviderDashboard() {
     };
   }, [loadListings]);
 
-  function updateStatus(id: number, status: FoodListing["status"]) {
-    const updated = listings.map((item) => item.id === id ? { ...item, status } : item);
-    setListings(updated);
-    saveProviderListings(updated);
+  async function markCollected(id: number) {
+    if (!session) return;
+    const res = await fetch(`/api/listings/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: session.user_id, status: "delivered" }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      setError(result.error || "Unable to update this listing.");
+      return;
+    }
+    loadListings();
   }
 
   const availableCount = listings.filter((item) => item.status === "Available").length;
@@ -83,14 +95,15 @@ export default function ProviderDashboard() {
 
       <section className="provider-listings">
         <div className="provider-section-heading">
-          <div><p className="provider-eyebrow">YOUR CONTRIBUTION</p><h2>Recently Added Food</h2><p>New food listings are saved here as soon as you publish them.</p></div>
+          <div><p className="provider-eyebrow">YOUR CONTRIBUTION</p><h2>Recently Added Food</h2><p>Your most recent food listings, straight from the database.</p></div>
           <Link href="/provider/listings" className="text-action">Manage all listings →</Link>
         </div>
+        {error && <p className="claim-error">{error}</p>}
         {!loaded ? <p>Loading your listings...</p> : listings.length === 0 ? (
           <div className="provider-empty"><span>🥗</span><h3>No listings yet</h3><p>Your published food items will appear here.</p><Link href="/provider/listings/new">Add Your First Listing</Link></div>
         ) : (
           <div className="provider-listing-grid">
-            {[...listings].sort((a, b) => b.id - a.id).slice(0, 6).map((item) => (
+            {listings.slice(0, 6).map((item) => (
               <article className="provider-listing-card" key={item.id}>
                 <div className="provider-food-image">
                   {item.imageData ? <img src={item.imageData} alt={item.name} /> : <span>{item.emoji || "🥗"}</span>}
@@ -99,8 +112,8 @@ export default function ProviderDashboard() {
                 <div className="provider-card-content">
                   <div className="provider-card-title"><h3>{item.name}</h3><span className={`provider-status ${item.status === "Available" ? "provider-available" : "provider-claimed"}`}>{item.status}</span></div>
                   <div className="provider-food-details"><p><strong>Quantity:</strong> {item.quantity}</p><p><strong>Pickup:</strong> {item.pickupTime}</p><p><strong>Location:</strong> {item.location}</p></div>
-                  {item.status === "Available" && <button className="provider-mark-button" onClick={() => updateStatus(item.id, "Claimed")}>Mark as Claimed</button>}
-                  {item.status === "Claimed" && <button className="provider-mark-button" onClick={() => updateStatus(item.id, "Collected")}>Mark as Collected</button>}
+                  {item.recipientName && <p className="provider-food-details"><strong>Claimed by:</strong> {item.recipientName}</p>}
+                  {item.status === "Claimed" && <button className="provider-mark-button" onClick={() => markCollected(item.id)}>Mark as Collected</button>}
                 </div>
               </article>
             ))}

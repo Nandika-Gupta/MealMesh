@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
-import { getListingDetailsCollection } from "@/lib/mongodb";
+import { attachListingDetails, getListingDetailsCollection } from "@/lib/mongodb";
+
+function parseListingId(id: string) {
+  const listingId = Number(id);
+  return Number.isInteger(listingId) && listingId > 0 ? listingId : null;
+}
 
 // GET /api/listings/[id] - fetch one listing (any status) with its MongoDB details
 export async function GET(_req: NextRequest, ctx: RouteContext<"/api/listings/[id]">) {
-  const { id } = await ctx.params;
-  const listingId = Number(id);
-
-  if (!Number.isInteger(listingId) || listingId <= 0) {
+  const listingId = parseListingId((await ctx.params).id);
+  if (!listingId) {
     return NextResponse.json({ error: "Invalid listing id." }, { status: 400 });
   }
 
@@ -34,17 +37,97 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/listings/[i
     return NextResponse.json({ error: "Listing not found" }, { status: 404 });
   }
 
-  const listing = result.rows[0];
-  const collection = await getListingDetailsCollection();
-  const details = await collection.findOne({ listing_id: listing.listing_id });
+  const [listing] = await attachListingDetails(result.rows);
+  return NextResponse.json(listing);
+}
 
-  return NextResponse.json({
-    ...listing,
-    photos: details?.photos || [],
-    packaging_notes: details?.packaging_notes || "",
-    allergen_tags: details?.allergen_tags || [],
-    food_name: details?.food_name || "",
-    pickup_location: details?.pickup_location || "",
-    pickup_from: details?.pickup_from || null,
-  });
+// PATCH /api/listings/[id] - provider marks a claimed listing as collected (atomic transaction)
+export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/listings/[id]">) {
+  const listingId = parseListingId((await ctx.params).id);
+  if (!listingId) {
+    return NextResponse.json({ error: "Invalid listing id." }, { status: 400 });
+  }
+
+  const { user_id, status } = await req.json();
+  if (!user_id || status !== "delivered") {
+    return NextResponse.json({ error: "user_id and status 'delivered' are required." }, { status: 400 });
+  }
+
+  const db = getDb();
+  const client = await db.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const check = await client.query(
+      "SELECT provider_id, status FROM SurplusListings WHERE listing_id = $1 FOR UPDATE",
+      [listingId]
+    );
+
+    if (check.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+    }
+
+    if (check.rows[0].provider_id !== Number(user_id)) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "You can only update your own listings." }, { status: 403 });
+    }
+
+    if (check.rows[0].status !== "claimed") {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "Only claimed listings can be marked as collected." }, { status: 409 });
+    }
+
+    await client.query("UPDATE SurplusListings SET status = 'delivered' WHERE listing_id = $1", [listingId]);
+    await client.query(
+      "UPDATE Claims SET status = 'completed' WHERE listing_id = $1 AND status = 'pending'",
+      [listingId]
+    );
+
+    await client.query("COMMIT");
+    return NextResponse.json({ listing_id: listingId, status: "delivered" });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    return NextResponse.json({ error: "Could not update listing" }, { status: 500 });
+  } finally {
+    client.release();
+  }
+}
+
+// DELETE /api/listings/[id] - the listing's provider or an admin removes a listing
+export async function DELETE(req: NextRequest, ctx: RouteContext<"/api/listings/[id]">) {
+  const listingId = parseListingId((await ctx.params).id);
+  if (!listingId) {
+    return NextResponse.json({ error: "Invalid listing id." }, { status: 400 });
+  }
+
+  const { user_id } = await req.json();
+  if (!user_id) {
+    return NextResponse.json({ error: "user_id is required." }, { status: 400 });
+  }
+
+  const db = getDb();
+  const [listing, user] = await Promise.all([
+    db.query("SELECT provider_id FROM SurplusListings WHERE listing_id = $1", [listingId]),
+    db.query("SELECT role FROM Users WHERE user_id = $1 AND is_active = true", [user_id]),
+  ]);
+
+  if (listing.rows.length === 0) {
+    return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+  }
+
+  const isOwner = listing.rows[0].provider_id === Number(user_id);
+  const isAdmin = user.rows[0]?.role === "admin";
+  if (!isOwner && !isAdmin) {
+    return NextResponse.json({ error: "You can only delete your own listings." }, { status: 403 });
+  }
+
+  // Claims and Reviews for this listing are removed by ON DELETE CASCADE
+  await db.query("DELETE FROM SurplusListings WHERE listing_id = $1", [listingId]);
+
+  const collection = await getListingDetailsCollection();
+  await collection.deleteOne({ listing_id: listingId });
+
+  return NextResponse.json({ listing_id: listingId, deleted: true });
 }
