@@ -2,9 +2,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { getSession, type SessionUser } from "@/lib/session";
+import { clearSession, useRequireSession } from "@/lib/session";
 import { toDisplayListing, type ApiListing, type DisplayListing } from "@/lib/listings";
 
 type ApiClaim = ApiListing & { claim_id: number; claim_status: "pending" | "completed" | "cancelled"; claimed_at: string; review_id: number | null };
@@ -16,26 +15,21 @@ function toClaim(row: ApiClaim): Claim {
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const [session, setSession] = useState<SessionUser | null>(null);
+  // providers and admins are sent to their own dashboards
+  const session = useRequireSession(["recipient"]);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   const loadClaims = useCallback(async () => {
-    const user = getSession();
-    if (!user) { router.replace("/login"); return; }
-    // providers and admins have their own dashboards
-    if (user.role === "provider") { router.replace("/provider/dashboard"); return; }
-    if (user.role === "admin") { router.replace("/admin"); return; }
-    setSession(user);
+    if (!session) return;
     try {
-      const res = await fetch(`/api/claims?recipient_id=${user.user_id}`);
+      const res = await fetch(`/api/claims?recipient_id=${session.user_id}`);
       if (!res.ok) throw new Error("Request failed");
       const data: ApiClaim[] = await res.json();
       setClaims(data.map(toClaim)); setError("");
     } catch { setError("Unable to load your claims."); }
     finally { setLoaded(true); }
-  }, [router]);
+  }, [session]);
   useEffect(() => { loadClaims(); window.addEventListener("focus", loadClaims); return () => window.removeEventListener("focus", loadClaims); }, [loadClaims]);
   async function markCollected(claimId: number) {
     if (!session) return;
@@ -44,11 +38,12 @@ export default function DashboardPage() {
     if (!res.ok) { setError(result.error || "Unable to update this claim."); return; }
     loadClaims();
   }
+  if (!session) return <main className="dashboard-page"><p>Checking your session...</p></main>;
   const collectedCount = claims.filter((claim) => claim.claimStatus === "Collected").length;
   const awaitingCount = claims.filter((claim) => claim.claimStatus === "Confirmed").length;
   return <main className="dashboard-page">
-    <nav className="dashboard-navbar"><Link href="/" className="dashboard-logo">MealMesh</Link><div className="dashboard-nav-links"><Link href="/listings">Browse Food</Link><Link href="/dashboard" className="active">Dashboard</Link><Link href="/reviews">Reviews</Link><Link href="/login">Logout</Link></div></nav>
-    <section className="dashboard-welcome"><div><p className="dashboard-eyebrow">RECIPIENT DASHBOARD</p><h1>{session ? `Hi ${session.name}, your food is all in one place.` : "Your food, all in one place."}</h1><p>Track your claimed food and collection details.</p></div><Link href="/listings" className="dashboard-browse-button">+ Find Food</Link></section>
+    <nav className="dashboard-navbar"><Link href="/" className="dashboard-logo">MealMesh</Link><div className="dashboard-nav-links"><Link href="/listings">Browse Food</Link><Link href="/dashboard" className="active">Dashboard</Link><Link href="/reviews">Reviews</Link><Link href="/login" onClick={clearSession}>Logout</Link></div></nav>
+    <section className="dashboard-welcome"><div><p className="dashboard-eyebrow">RECIPIENT DASHBOARD</p><h1>Hi {session.name}, your food is all in one place.</h1><p>Track your claimed food and collection details.</p></div><Link href="/listings" className="dashboard-browse-button">+ Find Food</Link></section>
     <section className="dashboard-stats"><div className="dashboard-stat-card"><span>📦</span><p>Total Claims</p><h2>{loaded ? claims.length : "—"}</h2></div><div className="dashboard-stat-card"><span>✓</span><p>Collected</p><h2>{collectedCount}</h2></div><div className="dashboard-stat-card"><span>🕒</span><p>Awaiting Pickup</p><h2>{awaitingCount}</h2></div></section>
     <section className="dashboard-claims"><div className="dashboard-section-heading"><div><p className="dashboard-eyebrow">YOUR ACTIVITY</p><h2>Your Food Claims</h2><p>Claims you confirm from Browse Food will appear here automatically.</p></div><Link href="/listings">Explore listings →</Link></div>
       {error && <p className="claim-error">{error}</p>}

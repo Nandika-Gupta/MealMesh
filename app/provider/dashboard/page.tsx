@@ -2,28 +2,21 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { getSession, type SessionUser } from "@/lib/session";
+import { clearSession, useRequireSession } from "@/lib/session";
 import { toDisplayListing, type ApiListing, type DisplayListing } from "@/lib/listings";
 
 export default function ProviderDashboard() {
-  const router = useRouter();
-  const [session, setSession] = useState<SessionUser | null>(null);
+  const session = useRequireSession(["provider"]);
   const [listings, setListings] = useState<DisplayListing[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
 
   const loadListings = useCallback(async () => {
-    const user = getSession();
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
-    setSession(user);
+    if (!session) return;
 
     try {
-      const res = await fetch(`/api/listings?provider_id=${user.user_id}`);
+      const res = await fetch(`/api/listings?provider_id=${session.user_id}`);
       if (!res.ok) throw new Error("Request failed");
       const data: ApiListing[] = await res.json();
       setListings(data.map(toDisplayListing));
@@ -34,7 +27,7 @@ export default function ProviderDashboard() {
     } finally {
       setLoaded(true);
     }
-  }, [router]);
+  }, [session]);
 
   useEffect(() => {
     loadListings();
@@ -61,6 +54,8 @@ export default function ProviderDashboard() {
     loadListings();
   }
 
+  if (!session) return <main className="provider-page"><p>Checking your session...</p></main>;
+
   const availableCount = listings.filter((item) => item.status === "Available").length;
   const claimedCount = listings.filter((item) => item.status === "Claimed").length;
   const collectedCount = listings.filter((item) => item.status === "Collected").length;
@@ -73,7 +68,7 @@ export default function ProviderDashboard() {
           <Link href="/listings">Browse Food</Link>
           <Link href="/provider/dashboard" className="active">Dashboard</Link>
           <Link href="/provider/listings">My Listings</Link>
-          <Link href="/login">Logout</Link>
+          <Link href="/login" onClick={clearSession}>Logout</Link>
         </div>
       </nav>
 

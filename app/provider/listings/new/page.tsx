@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getSession, type SessionUser } from "@/lib/session";
+import { useRequireSession } from "@/lib/session";
 
 type Category = { category_id: number; name: string };
 
@@ -27,19 +27,14 @@ export default function NewFoodListing() {
 
   const [form, setForm] = useState(emptyForm);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [session, setSession] = useState<SessionUser | null>(null);
+  const session = useRequireSession(["provider"]);
   const [submitting, setSubmitting] = useState(false);
 
   const [message, setMessage] = useState("");
   const [minimumDate, setMinimumDate] = useState("");
 
   useEffect(() => {
-    const user = getSession();
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
-    setSession(user);
+    if (!session) return;
 
     fetch("/api/categories")
       .then((res) => res.json())
@@ -50,7 +45,7 @@ export default function NewFoodListing() {
         }
       })
       .catch(() => setMessage("Unable to load food categories."));
-  }, [router]);
+  }, [session]);
 
   useEffect(() => {
     const today = new Date();
@@ -91,15 +86,7 @@ export default function NewFoodListing() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (!session) {
-      router.replace("/login");
-      return;
-    }
-
-    if (session.role !== "provider") {
-      setMessage("Only provider accounts can post food listings.");
-      return;
-    }
+    if (!session) return;
 
     if (form.pickupEnd <= form.pickupStart) {
       setMessage("Pickup end time must be later than the start time.");
@@ -156,6 +143,8 @@ export default function NewFoodListing() {
       setSubmitting(false);
     }
   }
+
+  if (!session) return <main className="new-listing-page"><p>Checking your session...</p></main>;
 
   return (
     <main className="new-listing-page">

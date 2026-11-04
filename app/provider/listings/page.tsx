@@ -2,14 +2,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { getSession, type SessionUser } from "@/lib/session";
+import { clearSession, useRequireSession, type SessionUser } from "@/lib/session";
 import { toDisplayListing, type ApiListing, type DisplayListing } from "@/lib/listings";
 
 export default function MyListingsPage() {
-  const router = useRouter();
-  const [session, setSession] = useState<SessionUser | null>(null);
+  const session = useRequireSession(["provider"]);
   const [items, setItems] = useState<DisplayListing[]>([]);
   const [filter, setFilter] = useState("All");
   const [loaded, setLoaded] = useState(false);
@@ -26,12 +24,7 @@ export default function MyListingsPage() {
     finally { setLoaded(true); }
   }, []);
 
-  useEffect(() => {
-    const user = getSession();
-    if (!user) { router.replace("/login"); return; }
-    setSession(user);
-    loadListings(user);
-  }, [router, loadListings]);
+  useEffect(() => { if (session) loadListings(session); }, [session, loadListings]);
 
   async function markCollected(id: number) {
     if (!session) return;
@@ -47,10 +40,11 @@ export default function MyListingsPage() {
     if (!res.ok) { setError(result.error || "Unable to delete this listing."); return; }
     setItems((current) => current.filter((item) => item.id !== id));
   }
+  if (!session) return <main className="provider-page"><p>Checking your session...</p></main>;
   const visible = filter === "All" ? items : items.filter((item) => item.status === filter);
 
   return <main className="provider-page">
-    <nav className="provider-navbar"><Link href="/" className="provider-logo">MealMesh</Link><div className="provider-nav-links"><Link href="/listings">Browse Food</Link><Link href="/provider/dashboard">Dashboard</Link><Link href="/provider/listings" className="active">My Listings</Link></div></nav>
+    <nav className="provider-navbar"><Link href="/" className="provider-logo">MealMesh</Link><div className="provider-nav-links"><Link href="/listings">Browse Food</Link><Link href="/provider/dashboard">Dashboard</Link><Link href="/provider/listings" className="active">My Listings</Link><Link href="/login" onClick={clearSession}>Logout</Link></div></nav>
     <section className="provider-welcome"><div><p className="provider-eyebrow">PROVIDER WORKSPACE</p><h1>My food listings</h1><p>Update availability and keep your contributions organised.</p></div><Link href="/provider/listings/new" className="provider-add-button">+ Add Food Listing</Link></section>
     <section className="provider-listings"><div className="listing-management-toolbar"><div className="category-filters">{["All", "Available", "Claimed", "Collected", "Expired"].map((value) => <button key={value} className={filter === value ? "category-active" : ""} onClick={() => setFilter(value)}>{value}</button>)}</div><span>{visible.length} listing(s)</span></div>
       {error && <p className="claim-error">{error}</p>}
