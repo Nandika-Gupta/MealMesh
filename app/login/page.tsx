@@ -1,17 +1,19 @@
-
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleLogin(e: React.FormEvent<HTMLFormElement>) {
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     if (!email || !password) {
@@ -19,9 +21,35 @@ export default function LoginPage() {
       return;
     }
 
-    setMessage(
-      "Login form validated! Authentication will be enabled after backend integration."
-    );
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        setMessage(result.error || "Invalid email or password.");
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem(
+        "mealmesh-user",
+        JSON.stringify({ user_id: result.user_id, name: result.name, role: result.role })
+      );
+
+      setMessage("Login successful! Redirecting...");
+      router.push("/dashboard");
+    } catch (error) {
+      setMessage("Something went wrong. Please try again.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -134,8 +162,8 @@ export default function LoginPage() {
               <div className="auth-message">{message}</div>
             )}
 
-            <button type="submit" className="auth-submit">
-              Log in <span>→</span>
+            <button type="submit" className="auth-submit" disabled={loading}>
+              {loading ? "Logging in..." : "Log in"} <span>→</span>
             </button>
           </form>
 
