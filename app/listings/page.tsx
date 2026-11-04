@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Navbar from "@/components/Navbar";
 
 type FoodItem = {
   id: string;
@@ -108,26 +109,7 @@ export default function ListingsPage() {
 
   return (
     <main className="listings-page">
-      <nav className="listings-navbar">
-        <Link href="/" className="brand">
-          <span className="brand-icon">🥬</span>
-          <span>
-            Meal<span className="brand-highlight">Mesh</span>
-          </span>
-        </Link>
-
-        <div className="listings-nav-links">
-          <Link href="/">Home</Link>
-          <Link href="/listings" className="active">
-            Food listings
-          </Link>
-          <Link href="/reviews">Reviews</Link>
-          <Link href="/login">Log in</Link>
-          <Link href="/signup" className="listing-signup">
-            Join us →
-          </Link>
-        </div>
-      </nav>
+      <Navbar variant="listings" />
 
       <section className="listings-hero">
         <div className="section-tag">SHARE MORE. WASTE LESS.</div>

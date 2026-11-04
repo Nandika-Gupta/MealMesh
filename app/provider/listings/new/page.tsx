@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRequireSession } from "@/lib/session";
+import Navbar from "@/components/Navbar";
 
 type Category = { category_id: number; name: string };
 
@@ -148,17 +149,7 @@ export default function NewFoodListing() {
 
   return (
     <main className="new-listing-page">
-      <nav className="provider-navbar">
-        <Link href="/" className="provider-brand">
-          🥬 MealMesh
-        </Link>
-
-        <div>
-          <Link href="/listings">Browse Food</Link>
-          <Link href="/provider/dashboard">Dashboard</Link>
-          <Link href="/provider/listings">My Listings</Link>
-        </div>
-      </nav>
+      <Navbar variant="provider-form" />
 
       <section className="new-listing-container">
         <Link href="/provider/dashboard" className="back-link">

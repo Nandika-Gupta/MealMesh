@@ -3,8 +3,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { clearSession, useRequireSession, type SessionUser } from "@/lib/session";
+import { useRequireSession, type SessionUser } from "@/lib/session";
 import { toDisplayListing, type ApiListing, type DisplayListing } from "@/lib/listings";
+import Navbar from "@/components/Navbar";
 
 export default function MyListingsPage() {
   const session = useRequireSession(["provider"]);
@@ -44,7 +45,7 @@ export default function MyListingsPage() {
   const visible = filter === "All" ? items : items.filter((item) => item.status === filter);
 
   return <main className="provider-page">
-    <nav className="provider-navbar"><Link href="/" className="provider-logo">MealMesh</Link><div className="provider-nav-links"><Link href="/listings">Browse Food</Link><Link href="/provider/dashboard">Dashboard</Link><Link href="/provider/listings" className="active">My Listings</Link><Link href="/login" onClick={clearSession}>Logout</Link></div></nav>
+    <Navbar variant="provider" />
     <section className="provider-welcome"><div><p className="provider-eyebrow">PROVIDER WORKSPACE</p><h1>My food listings</h1><p>Update availability and keep your contributions organised.</p></div><Link href="/provider/listings/new" className="provider-add-button">+ Add Food Listing</Link></section>
     <section className="provider-listings"><div className="listing-management-toolbar"><div className="category-filters">{["All", "Available", "Claimed", "Collected", "Expired"].map((value) => <button key={value} className={filter === value ? "category-active" : ""} onClick={() => setFilter(value)}>{value}</button>)}</div><span>{visible.length} listing(s)</span></div>
       {error && <p className="claim-error">{error}</p>}

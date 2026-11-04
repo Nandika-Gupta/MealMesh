@@ -1,3 +1,5 @@
+import Navbar from "@/components/Navbar";
+
 
 const features = [
   {
@@ -41,40 +43,16 @@ const steps = [
 export default function Home() {
   return (
     <main>
-      <nav className="navbar">
-        <a href="/" className="brand">
-          <span className="brand-icon">🥬</span>
-          <span>
-            Meal<span className="brand-highlight">Mesh</span>
-          </span>
-        </a>
-
-        <div className="nav-links">
-          <a href="#about">About</a>
-          <a href="#how-it-works">How it works</a>
-          <a href="#impact">Our impact</a>
-        </div>
-
-        <div className="nav-actions">
-          <a href="/dashboard" className="nav-login">
-            Dashboard
-          </a>
-
-          <a href="/provider/dashboard" className="nav-login">
-            Provider
-          </a>
-
-          <a href="/reviews" className="nav-login">Reviews</a>
-          <a href="/admin" className="nav-login">Admin</a>
-          <a href="/login" className="nav-login">
-            Log in
-          </a>
-
-          <a href="/signup" className="nav-signup">
-            Get started <span>↗</span>
-          </a>
-        </div>
-      </nav>
+      <Navbar
+        variant="home"
+        sectionLinks={
+          <>
+            <a href="#about">About</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#impact">Our impact</a>
+          </>
+        }
+      />
 
       <section className="hero">
         <div className="hero-content">

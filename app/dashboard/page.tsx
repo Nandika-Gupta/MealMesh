@@ -3,8 +3,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { clearSession, useRequireSession } from "@/lib/session";
+import { useRequireSession } from "@/lib/session";
 import { toDisplayListing, type ApiListing, type DisplayListing } from "@/lib/listings";
+import Navbar from "@/components/Navbar";
 
 type ApiClaim = ApiListing & { claim_id: number; claim_status: "pending" | "completed" | "cancelled"; claimed_at: string; review_id: number | null };
 type Claim = DisplayListing & { claimId: number; provider: string; claimStatus: "Confirmed" | "Collected" | "Cancelled"; reviewed: boolean };
@@ -42,7 +43,7 @@ export default function DashboardPage() {
   const collectedCount = claims.filter((claim) => claim.claimStatus === "Collected").length;
   const awaitingCount = claims.filter((claim) => claim.claimStatus === "Confirmed").length;
   return <main className="dashboard-page">
-    <nav className="dashboard-navbar"><Link href="/" className="dashboard-logo">MealMesh</Link><div className="dashboard-nav-links"><Link href="/listings">Browse Food</Link><Link href="/dashboard" className="active">Dashboard</Link><Link href="/reviews">Reviews</Link><Link href="/login" onClick={clearSession}>Logout</Link></div></nav>
+    <Navbar variant="dashboard" />
     <section className="dashboard-welcome"><div><p className="dashboard-eyebrow">RECIPIENT DASHBOARD</p><h1>Hi {session.name}, your food is all in one place.</h1><p>Track your claimed food and collection details.</p></div><Link href="/listings" className="dashboard-browse-button">+ Find Food</Link></section>
     <section className="dashboard-stats"><div className="dashboard-stat-card"><span>📦</span><p>Total Claims</p><h2>{loaded ? claims.length : "—"}</h2></div><div className="dashboard-stat-card"><span>✓</span><p>Collected</p><h2>{collectedCount}</h2></div><div className="dashboard-stat-card"><span>🕒</span><p>Awaiting Pickup</p><h2>{awaitingCount}</h2></div></section>
     <section className="dashboard-claims"><div className="dashboard-section-heading"><div><p className="dashboard-eyebrow">YOUR ACTIVITY</p><h2>Your Food Claims</h2><p>Claims you confirm from Browse Food will appear here automatically.</p></div><Link href="/listings">Explore listings →</Link></div>

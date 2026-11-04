@@ -7,6 +7,7 @@ import Link from "next/link";
 import { readProviderListings, saveProviderListings } from "@/lib/food-storage";
 import { getSession } from "@/lib/session";
 import { toDisplayListing, type ApiListing } from "@/lib/listings";
+import Navbar from "@/components/Navbar";
 
 type FoodListing = { id: number; name: string; category: string; quantity: string; location: string; pickupTime: string; status: string; emoji?: string; description?: string; imageData?: string };
 type Claim = { id: string; listingId: string; name: string; category: string; quantity: string; provider: string; location: string; pickupTime: string; status: "Confirmed" | "Collected"; emoji: string; imageData?: string; claimedAt: number };
@@ -107,7 +108,7 @@ export default function ClaimFoodPage() {
   if (loading) return <main className="claim-page">Loading food listing...</main>;
   if (!listing) return <main className="claim-page"><div className="claim-not-found"><h2>Food listing not found</h2><p>This listing may have been removed.</p><Link href="/listings">Browse available food</Link></div></main>;
 
-  return <main className="claim-page"><nav className="claim-navbar"><Link href="/" className="claim-logo">MealMesh</Link><Link href="/listings">Back to listings</Link></nav>
+  return <main className="claim-page"><Navbar variant="claim" />
     <section className="claim-container"><div className="claim-image">{listing.imageData ? <img src={listing.imageData} alt={listing.name} /> : <span>{listing.emoji || "🍽️"}</span>}</div><div className="claim-details"><p className="claim-eyebrow">FOOD DETAILS</p><span className="claim-category">{listing.category}</span><h1>{listing.name}</h1><p className="claim-description">{listing.description || "Food shared through the MealMesh community."}</p><div className="claim-info"><p><strong>Quantity:</strong> {listing.quantity}</p><p><strong>Pickup location:</strong> {listing.location}</p><p><strong>Pickup time:</strong> {listing.pickupTime}</p><p><strong>Status:</strong> {confirmed ? "Claimed by you" : listing.status}</p></div>{error && <p className="claim-error">{error}</p>}
       {confirmed ? <div className="claim-success"><h2>Claim confirmed!</h2><p>Your claim is now saved in your recipient dashboard. Please collect it during the pickup window.</p><Link href="/dashboard">View my dashboard</Link></div> : listing.status !== "Available" ? <div className="claim-success"><h2>{listing.status === "Expired" ? "Listing expired" : "Already claimed"}</h2><p>This food listing is no longer available.</p><Link href="/listings">Browse other listings</Link></div> : <button className="claim-action" onClick={handleClaim} disabled={claiming}>{claiming ? "Claiming..." : "Confirm Food Claim"}</button>}
     </div></section><footer className="claim-footer"><p>© {new Date().getFullYear()} MealMesh. Sharing food, reducing waste.</p></footer></main>;

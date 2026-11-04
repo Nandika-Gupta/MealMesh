@@ -1,10 +1,10 @@
 /* eslint react-hooks/set-state-in-effect: off, @next/next/no-img-element: off */
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { clearSession, useRequireSession } from "@/lib/session";
+import { useRequireSession } from "@/lib/session";
 import { toDisplayListing, type ApiListing } from "@/lib/listings";
+import Navbar from "@/components/Navbar";
 
 type User = { user_id: number; name: string; email: string; role: string; org_name: string | null; is_active: boolean; created_at: string };
 type Claim = { claim_id: number; listing_id: number; claim_status: string; claimed_at: string; category_name: string; recipient_name: string; provider_name: string };
@@ -38,7 +38,7 @@ export default function AdminDashboard() {
   if (!session) return <main className="provider-page"><p>Checking your session...</p></main>;
   const listings = data.listings.map((row) => ({ ...toDisplayListing(row), provider: row.provider_org || row.provider_name }));
   const date = (value: string | null) => value ? new Date(value).toLocaleString() : "—";
-  return <main className="provider-page"><nav className="provider-navbar"><Link href="/" className="provider-logo">MealMesh</Link><div className="provider-nav-links"><Link href="/listings">Browse Food</Link><Link href="/reviews">Reviews</Link><Link href="/login" onClick={clearSession}>Logout</Link></div></nav>
+  return <main className="provider-page"><Navbar variant="provider" />
     <section className="provider-welcome"><div><p className="provider-eyebrow">ADMINISTRATION</p><h1>Platform overview</h1><p>All users, food listings, claims and feedback stored in MealMesh.</p></div><button className="provider-add-button" onClick={load}>Refresh overview</button></section>
     {error && <p className="claim-error">{error}</p>}
     <section className="provider-stats"><div className="provider-stat-card"><span>👥</span><p>Users</p><h2>{loaded ? data.users.length : "—"}</h2></div><div className="provider-stat-card"><span>📦</span><p>Total Listings</p><h2>{listings.length}</h2></div><div className="provider-stat-card"><span>🌱</span><p>Available</p><h2>{listings.filter(x => x.status === "Available").length}</h2></div><div className="provider-stat-card"><span>🤝</span><p>Claims</p><h2>{data.claims.length}</h2></div><div className="provider-stat-card"><span>⭐</span><p>Reviews</p><h2>{data.reviews.length}</h2></div></section>

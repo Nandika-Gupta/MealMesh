@@ -3,8 +3,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { clearSession, useRequireSession } from "@/lib/session";
+import { useRequireSession } from "@/lib/session";
 import { toDisplayListing, type ApiListing, type DisplayListing } from "@/lib/listings";
+import Navbar from "@/components/Navbar";
 
 export default function ProviderDashboard() {
   const session = useRequireSession(["provider"]);
@@ -62,15 +63,7 @@ export default function ProviderDashboard() {
 
   return (
     <main className="provider-page">
-      <nav className="provider-navbar">
-        <Link href="/" className="provider-logo">MealMesh</Link>
-        <div className="provider-nav-links">
-          <Link href="/listings">Browse Food</Link>
-          <Link href="/provider/dashboard" className="active">Dashboard</Link>
-          <Link href="/provider/listings">My Listings</Link>
-          <Link href="/login" onClick={clearSession}>Logout</Link>
-        </div>
-      </nav>
+      <Navbar variant="provider" />
 
       <section className="provider-welcome">
         <div>
