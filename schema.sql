@@ -125,3 +125,25 @@ ALTER TABLE Reviews
     ALTER COLUMN comment TYPE VARCHAR(500);
 
 DROP INDEX idx_claims_status;
+
+-- Advanced query demonstrations: GROUP BY, correlated subquery, nested subquery
+
+SELECT fc.name AS category_name, COUNT(sl.listing_id) AS total_listings, AVG(sl.quantity) AS avg_quantity
+FROM SurplusListings sl
+JOIN FoodCategories fc ON fc.category_id = sl.category_id
+GROUP BY fc.name
+HAVING COUNT(sl.listing_id) >= 1
+ORDER BY total_listings DESC;
+
+SELECT sl.listing_id, sl.category_id, sl.quantity
+FROM SurplusListings sl
+WHERE sl.quantity > (
+  SELECT AVG(sl2.quantity)
+  FROM SurplusListings sl2
+  WHERE sl2.category_id = sl.category_id
+);
+
+SELECT name, email FROM Users
+WHERE user_id IN (
+  SELECT provider_id FROM SurplusListings WHERE status = 'claimed'
+);
