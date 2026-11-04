@@ -1,5 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { attachListingDetails } from "@/lib/mongodb";
+
+// GET /api/claims?recipient_id=X - fetch a recipient's claims with listing and review info
+export async function GET(req: NextRequest) {
+  const recipientId = Number(req.nextUrl.searchParams.get("recipient_id"));
+
+  if (!Number.isInteger(recipientId) || recipientId <= 0) {
+    return NextResponse.json({ error: "A valid recipient_id is required." }, { status: 400 });
+  }
+
+  const db = getDb();
+  const result = await db.query(
+    `SELECT c.claim_id,
+            c.status       AS claim_status,
+            c.claimed_at,
+            c.pickup_time,
+            sl.listing_id,
+            fc.name        AS category_name,
+            sl.quantity,
+            sl.unit,
+            sl.usable_by,
+            sl.status,
+            u.name         AS provider_name,
+            u.org_name     AS provider_org,
+            r.review_id
+     FROM Claims c
+     JOIN SurplusListings sl ON sl.listing_id = c.listing_id
+     JOIN FoodCategories fc  ON fc.category_id = sl.category_id
+     JOIN Users u            ON u.user_id = sl.provider_id
+     LEFT JOIN Reviews r     ON r.claim_id = c.claim_id
+     WHERE c.recipient_id = $1
+     ORDER BY c.claimed_at DESC`,
+    [recipientId]
+  );
+
+  return NextResponse.json(await attachListingDetails(result.rows));
+}
 
 // POST /api/claims - a recipient claims a listing (atomic transaction)
 export async function POST(req: NextRequest) {

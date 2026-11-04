@@ -81,7 +81,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/listings/[
 
     await client.query("UPDATE SurplusListings SET status = 'delivered' WHERE listing_id = $1", [listingId]);
     await client.query(
-      "UPDATE Claims SET status = 'completed' WHERE listing_id = $1 AND status = 'pending'",
+      "UPDATE Claims SET status = 'completed', pickup_time = NOW() WHERE listing_id = $1 AND status = 'pending'",
       [listingId]
     );
 
