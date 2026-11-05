@@ -9,7 +9,7 @@ MealMesh connects food providers (restaurants, bakeries, event organizers) with
 surplus, edible food to nearby recipients (NGOs, shelters, individuals), reducing
 food waste through a simple claim-and-pickup workflow.
 
-## Team
+## Team Details
 
 - Nandika Gupta, PES2UG24CS303, Section E - Database design & implementation, backend integration
 - Tanvi Magalur, PES2UG24CS257, Section E - Frontend (Next.js), authentication, UI
