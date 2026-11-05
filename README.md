@@ -91,4 +91,4 @@ against a PostgreSQL instance (e.g. via the Neon SQL Editor or `psql`).
 
 The application is deployed on [Vercel](https://vercel.com), with the SQL and
 NoSQL databases hosted on Neon and MongoDB Atlas respectively, connected via
-environment variables configured in the Vercel project settings.
+environment variables configured in the Vercel project settings. Live demo: https://mealmesh-three.vercel.app
